@@ -1,7 +1,8 @@
 import { InteractivePass } from "@/components/InteractivePass";
+import { HeroBackgroundFilm } from "@/components/HeroBackgroundFilm";
 import { QrIcon } from "@/components/icons";
 
-import { Button, Container, Eyebrow, Note, SealRing, TraceLine } from "@/components/ui";
+import { Button, Container, Eyebrow, Note, TraceLine } from "@/components/ui";
 import { bandItems, manifestoLines } from "@/data";
 import { useReveal } from "@/hooks/useReveal";
 
@@ -13,6 +14,7 @@ export function Hero() {
       ref={ref}
       className="relative overflow-hidden bg-paper pt-[104px] pb-16 sm:pt-[132px] sm:pb-24"
     >
+      <HeroBackgroundFilm />
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
         <div className="mx-auto h-full w-full max-w-[1240px] px-5 sm:px-8 lg:px-12">
           <div className="grid h-full grid-cols-4 lg:grid-cols-12">
@@ -24,8 +26,7 @@ export function Hero() {
       </div>
 
       <Container className="relative">
-        <div className="grid items-center gap-12 lg:grid-cols-[1.03fr_0.97fr] lg:gap-10">
-          <div className="reveal">
+        <div className="reveal max-w-[760px]">
             <Eyebrow>Physical service identity · built for India</Eyebrow>
 
             <h1 className="font-display t-6 mt-7 text-deepviolet">
@@ -78,24 +79,6 @@ export function Hero() {
             </div>
           </div>
 
-          <div className="reveal relative">
-            <div aria-hidden="true" className="absolute inset-[8%] -rotate-3 bg-deepviolet/8 clip-corner" />
-            <div aria-hidden="true" className="absolute top-[18%] right-[3%] h-[52%] w-[18%] bg-saffron" />
-            <div aria-hidden="true" className="absolute inset-[3%] border border-violet/20">
-              <span className="absolute -top-px -left-px h-6 w-6 border-t-2 border-l-2 border-violet" />
-              <span className="absolute -top-px -right-px h-6 w-6 border-t-2 border-r-2 border-violet" />
-              <span className="absolute -bottom-px -left-px h-6 w-6 border-b-2 border-l-2 border-violet" />
-              <span className="absolute -right-px -bottom-px h-6 w-6 border-r-2 border-b-2 border-violet" />
-            </div>
-            <div className="relative px-4 py-14 sm:px-10 sm:py-16">
-              <InteractivePass className="mx-auto w-full max-w-[500px]" />
-            </div>
-            <div className="relative mt-1 flex flex-wrap justify-between gap-2">
-              <span className="label text-violet/70">Approved design image · scannable demo QR overlay</span>
-              <span className="label tnum text-violet/70">AP-7K3M9 · 01/50</span>
-            </div>
-          </div>
-        </div>
       </Container>
     </section>
   );
@@ -128,21 +111,28 @@ export function ProblemManifesto() {
   const ref = useReveal<HTMLElement>();
   return (
     <section ref={ref} className="relative overflow-hidden bg-plum py-20 text-ivory sm:py-28">
-      <SealRing
-        className="pointer-events-none absolute -top-24 -right-24 w-[420px] opacity-15"
-        tone="ivory"
-        text="LOST CONTACT · LOST HISTORY · "
-      />
       <Container className="relative">
-        <div className="reveal">
-          <Eyebrow tone="dark">Chapter 01 · The problem</Eyebrow>
+        <div className="grid gap-12 lg:grid-cols-[1.05fr_.95fr] lg:items-center">
+          <div className="reveal">
+            <Eyebrow tone="dark">Chapter 01 · The problem</Eyebrow>
+            <h2 className="font-display t-5 mt-7 max-w-[17ch]">
+              The job gets completed.
+              <br />
+              <span className="accent text-ivory/45">The connection gets lost.</span>
+            </h2>
+          </div>
+          <div className="reveal relative">
+            <div aria-hidden="true" className="absolute inset-[5%] -rotate-2 border border-ivory/15 bg-ivory/[.035] clip-corner" />
+            <div aria-hidden="true" className="absolute top-[16%] right-[2%] h-[56%] w-[16%] bg-saffron" />
+            <div className="relative px-5 py-12 sm:px-10">
+              <InteractivePass className="mx-auto w-full max-w-[500px]" />
+            </div>
+            <div className="relative flex flex-wrap justify-between gap-2 border-t border-ivory/12 pt-3">
+              <span className="label text-saffron">The physical way back</span>
+              <span className="label text-ivory/40">Interactive model</span>
+            </div>
+          </div>
         </div>
-
-        <h2 className="reveal font-display t-5 mt-7 max-w-[17ch]">
-          The job gets completed.
-          <br />
-          <span className="accent text-ivory/45">The connection gets lost.</span>
-        </h2>
 
         <ol className="mt-14 border-t border-ivory/15 sm:mt-16">
           {manifestoLines.map((line, i) => (

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import { PassObject } from "@/components/Scene";
-import { LazyProductFilm } from "@/components/LazyProductFilm";
 import { Container, Eyebrow, Note, SealRing } from "@/components/ui";
 import { gridLegend, ritualSteps, type GridState } from "@/data";
 import { useReveal, useScrollProgress } from "@/hooks/useReveal";
@@ -373,8 +372,10 @@ export function PassBox() {
           </div>
 
           <div className="reveal">
-            <LazyProductFilm />
-            <p className="label mt-3 text-ivory/45">Standard-pass concept film · muted · loaded only near this section</p>
+            <figure className="image-frame clip-corner group overflow-hidden border border-ivory/20 bg-paper p-3 sm:p-5">
+              <div className="overflow-hidden"><img src="/images/aranch-pass-fifty-box.webp" alt="Approved ARANCH PASS paperboard box concept containing fifty numbered service passes." draggable={false} loading="lazy" className="block h-auto w-full select-none transition-transform duration-700 ease-[cubic-bezier(.22,.68,.24,1)] group-hover:scale-[1.025]"/></div>
+            </figure>
+            <p className="label mt-3 text-ivory/45">Approved box direction · concept image, not a production batch</p>
           </div>
         </div>
       </Container>
