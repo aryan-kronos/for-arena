@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="ARANCH PASS">
+  <!-- Squircle radius and inner ticket use a golden-ratio construction. -->
+  <rect width="64" height="64" rx="15" fill="#2E0759"/>
+  <!-- 42 × 26 golden rectangle, with service-ticket notches. -->
+  <path d="M14 19h36l3 3v7l-2 3 2 3v7l-3 3H14l-3-3v-7l2-3-2-3v-7z" fill="#F7F0D8"/>
+  <!-- Geometric A: two 1:phi legs and an optically corrected crossbar. -->
+  <path d="m18 40 7.2-17h4.6L37 40h-5l-1.4-3.7h-6.7L22.5 40zm7.4-7.9h3.7l-1.85-5.05z" fill="#4D1688"/>
+  <!-- Connection trace from identity to scan node. -->
+  <path d="M36 33h5.4" stroke="#F4AD08" stroke-width="2.2" stroke-linecap="round"/>
+  <circle cx="44.5" cy="33" r="5.5" fill="#F4AD08"/>
+  <path d="M42 30.5h2v2h-2zm3.5 0h1.5V32h-1.5zM42 34h1.5v1.5H42zm3 0h2v2h-2z" fill="#2E0759"/>
+</svg>
