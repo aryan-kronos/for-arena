@@ -55,5 +55,25 @@ $$;
 revoke all on function get_my_portal_role() from public;
 grant execute on function get_my_portal_role() to authenticated;
 
+-- Helper to safely resolve login email by username for anon visitors
+create or replace function get_auth_email_by_username(p_username text)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_email text;
+begin
+  select email into v_email
+  from users
+  where lower(username) = lower(trim(p_username))
+  limit 1;
+  return v_email;
+end;
+$$;
+revoke all on function get_auth_email_by_username(text) from public;
+grant execute on function get_auth_email_by_username(text) to anon, authenticated;
+
 -- No client policies are granted on platform_admins. CEO assignments must be
 -- made with a reviewed server-side/admin process and logged.

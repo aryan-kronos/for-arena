@@ -99,14 +99,24 @@ export async function loginPortal(identifier: string, password: string): Promise
         }
       }
     } else {
-      // Username login: query users table for phone or email
-      const { data: userProfile } = await supabase
-        .from("users")
-        .select("phone, email")
-        .eq("username", cleanIdentifier.toLowerCase())
-        .maybeSingle();
+      // Username login:
+      // 1. Try RPC resolver (bypasses RLS safely for anon visitors)
+      const { data: rpcEmail } = await supabase
+        .rpc("get_auth_email_by_username", { p_username: cleanIdentifier.toLowerCase() });
 
-      const candidateEmail = userProfile?.email || (userProfile?.phone ? phoneToEmail(userProfile.phone) : null);
+      let candidateEmail: string | null = rpcEmail || null;
+
+      // 2. Fallback to direct query if available
+      if (!candidateEmail) {
+        const { data: userProfile } = await supabase
+          .from("users")
+          .select("phone, email")
+          .eq("username", cleanIdentifier.toLowerCase())
+          .maybeSingle();
+
+        candidateEmail = userProfile?.email || (userProfile?.phone ? phoneToEmail(userProfile.phone) : null);
+      }
+
       if (candidateEmail) {
         const res = await supabase.auth.signInWithPassword({ email: candidateEmail, password });
         if (!res.error && res.data.session) signedIn = true;
