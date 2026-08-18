@@ -91,18 +91,24 @@ export async function loginPortal(identifier: string, password: string): Promise
       } else {
         // 2. Try email-mapped phone login
         const res2 = await supabase.auth.signInWithPassword({ email: phoneToEmail(phone), password });
-        if (!res2.error && res2.data.session) signedIn = true;
+        if (!res2.error && res2.data.session) {
+          signedIn = true;
+        } else {
+          const res3 = await supabase.auth.signInWithPassword({ email: phoneToEmail(`91${phone.replace(/^\+?91/, "")}`), password });
+          if (!res3.error && res3.data.session) signedIn = true;
+        }
       }
     } else {
-      // Username login: query users table for phone
+      // Username login: query users table for phone or email
       const { data: userProfile } = await supabase
         .from("users")
         .select("phone, email")
         .eq("username", cleanIdentifier.toLowerCase())
         .maybeSingle();
 
-      if (userProfile?.phone) {
-        const res = await supabase.auth.signInWithPassword({ email: phoneToEmail(userProfile.phone), password });
+      const candidateEmail = userProfile?.email || (userProfile?.phone ? phoneToEmail(userProfile.phone) : null);
+      if (candidateEmail) {
+        const res = await supabase.auth.signInWithPassword({ email: candidateEmail, password });
         if (!res.error && res.data.session) signedIn = true;
       }
     }
