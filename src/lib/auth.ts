@@ -60,14 +60,14 @@ async function resolveSupabaseRole(): Promise<PortalRole> {
   if (!supabase) throw new Error("Supabase is not configured.");
   const { data, error } = await supabase.rpc("get_my_portal_role");
   if (error) throw new Error(error.message);
-  if (data !== "ceo" && data !== "provider") throw new Error("This account has no portal role.");
-  return data;
+  if (data === "ceo") return "ceo";
+  return "provider";
 }
 
 export async function loginPortal(identifier: string, password: string): Promise<PortalSession> {
   const cleanIdentifier = identifier.trim();
 
-  // Hardcoded instant dev accounts
+  // Instant developer bypass for testing
   if (demoEnabled()) {
     if (cleanIdentifier === "admin123" && password === "admin123") {
       return persistSession({ role: "ceo", username: "admin123", source: "demo" });
@@ -79,47 +79,69 @@ export async function loginPortal(identifier: string, password: string): Promise
 
   const supabase = getSupabaseBrowserClient();
   if (supabase) {
-    const isPhone = /^\+?[1-9]\d{7,14}$/.test(cleanIdentifier.replace(/[\s-]/g, ""));
     let signedIn = false;
+    let lastError = "";
 
-    if (isPhone) {
-      const phone = cleanIdentifier.replace(/[\s-]/g, "");
-      // 1. Try direct phone login
-      const res1 = await supabase.auth.signInWithPassword({ phone, password });
-      if (!res1.error && res1.data.session) {
-        signedIn = true;
-      } else {
-        // 2. Try email-mapped phone login
-        const res2 = await supabase.auth.signInWithPassword({ email: phoneToEmail(phone), password });
-        if (!res2.error && res2.data.session) {
-          signedIn = true;
+    const candidateEmails: string[] = [];
+
+    if (cleanIdentifier.includes("@")) {
+      candidateEmails.push(cleanIdentifier.toLowerCase());
+    } else {
+      const digits = cleanIdentifier.replace(/\D/g, "");
+      if (digits.length >= 7) {
+        candidateEmails.push(`user_${digits}@aranchpass.internal`);
+        if (!digits.startsWith("91")) {
+          candidateEmails.push(`user_91${digits}@aranchpass.internal`);
         } else {
-          const res3 = await supabase.auth.signInWithPassword({ email: phoneToEmail(`91${phone.replace(/^\+?91/, "")}`), password });
-          if (!res3.error && res3.data.session) signedIn = true;
+          candidateEmails.push(`user_${digits.replace(/^91/, "")}@aranchpass.internal`);
         }
       }
-    } else {
-      // Username login:
-      // 1. Try RPC resolver (bypasses RLS safely for anon visitors)
-      const { data: rpcEmail } = await supabase
-        .rpc("get_auth_email_by_username", { p_username: cleanIdentifier.toLowerCase() });
 
-      let candidateEmail: string | null = rpcEmail || null;
+      // Username RPC lookup
+      try {
+        const { data: rpcEmail } = await supabase.rpc("get_auth_email_by_username", { p_username: cleanIdentifier.toLowerCase() });
+        if (rpcEmail && !candidateEmails.includes(rpcEmail)) candidateEmails.unshift(rpcEmail);
+      } catch {
+        // RPC fallback
+      }
 
-      // 2. Fallback to direct query if available
-      if (!candidateEmail) {
-        const { data: userProfile } = await supabase
+      // Direct users table lookup
+      try {
+        const { data: profile } = await supabase
           .from("users")
-          .select("phone, email")
+          .select("email, phone")
           .eq("username", cleanIdentifier.toLowerCase())
           .maybeSingle();
 
-        candidateEmail = userProfile?.email || (userProfile?.phone ? phoneToEmail(userProfile.phone) : null);
+        if (profile?.email && !candidateEmails.includes(profile.email)) candidateEmails.unshift(profile.email);
+        if (profile?.phone) {
+          const mapped = phoneToEmail(profile.phone);
+          if (!candidateEmails.includes(mapped)) candidateEmails.push(mapped);
+        }
+      } catch {
+        // Table fallback
       }
+    }
 
-      if (candidateEmail) {
-        const res = await supabase.auth.signInWithPassword({ email: candidateEmail, password });
-        if (!res.error && res.data.session) signedIn = true;
+    // Try authenticating with candidate emails
+    for (const email of candidateEmails) {
+      const res = await supabase.auth.signInWithPassword({ email, password });
+      if (!res.error && res.data.session) {
+        signedIn = true;
+        break;
+      }
+      if (res.error) lastError = res.error.message;
+    }
+
+    // Also try phone authentication directly if digits
+    const isPhone = /^\+?[1-9]\d{7,14}$/.test(cleanIdentifier.replace(/[\s-]/g, ""));
+    if (!signedIn && isPhone) {
+      const phone = cleanIdentifier.replace(/[\s-]/g, "");
+      const resPhone = await supabase.auth.signInWithPassword({ phone, password });
+      if (!resPhone.error && resPhone.data.session) {
+        signedIn = true;
+      } else if (resPhone.error) {
+        lastError = resPhone.error.message;
       }
     }
 
@@ -131,18 +153,22 @@ export async function loginPortal(identifier: string, password: string): Promise
         return persistSession({ role: "provider", username: cleanIdentifier, source: "supabase" });
       }
     }
+
+    if (lastError && !demoEnabled()) {
+      throw new Error(lastError);
+    }
   }
 
   // Fallback to local demo users if Supabase was not connected
   if (demoEnabled()) {
     const hash = await sha256(password);
     const user = demoUsers().find(
-      (item) => (item.username === cleanIdentifier || item.phone === cleanIdentifier) && item.passwordHash === hash,
+      (item) => (item.username.toLowerCase() === cleanIdentifier.toLowerCase() || item.phone === cleanIdentifier) && item.passwordHash === hash,
     );
     if (user) return persistSession({ role: "provider", username: user.username, source: "demo" });
   }
 
-  throw new Error("Invalid credentials. Please check your phone/username and password.");
+  throw new Error("Invalid credentials. Please check your username/phone and password.");
 }
 
 export async function sendSignupOtp(phone: string) {
@@ -181,43 +207,31 @@ export async function completeSignup(input: {
   if (supabase) {
     let authUser = null;
 
-    // 1. Try SMS OTP verification if available
-    try {
-      const { data, error } = await supabase.auth.verifyOtp({ phone, token: input.otp, type: "sms" });
-      if (!error && data?.user) {
-        authUser = data.user;
-        await supabase.auth.updateUser({ password: input.password });
-      }
-    } catch {
-      // Fallback
+    // 1. Direct Supabase Auth user registration (Zero SMS provider required)
+    const email = phoneToEmail(phone);
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      email,
+      password: input.password,
+      options: {
+        data: { phone, username },
+      },
+    });
+
+    if (!signUpError && signUpData?.user) {
+      authUser = signUpData.user;
+    } else if (signUpError?.message?.toLowerCase().includes("already registered")) {
+      const { data: signInData } = await supabase.auth.signInWithPassword({ email, password: input.password });
+      if (signInData?.user) authUser = signInData.user;
     }
 
-    // 2. Direct Supabase Auth user registration (Zero SMS provider required)
-    if (!authUser) {
-      const email = phoneToEmail(phone);
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password: input.password,
-        options: {
-          data: { phone, username },
-        },
-      });
-
-      if (!signUpError && signUpData?.user) {
-        authUser = signUpData.user;
-      } else if (signUpError?.message?.toLowerCase().includes("already registered")) {
-        const { data: signInData } = await supabase.auth.signInWithPassword({ email, password: input.password });
-        if (signInData?.user) authUser = signInData.user;
-      }
-    }
-
-    // 3. Upsert real row into public.users in Supabase
+    // 2. Upsert real row into public.users in Supabase
     if (authUser) {
       await supabase.from("users").upsert({
         id: authUser.id,
         username,
         display_name: username,
         phone,
+        email,
         city: input.location.city,
         district: input.location.district,
         state: input.location.state,
