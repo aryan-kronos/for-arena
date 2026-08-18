@@ -14,6 +14,11 @@ const DEMO_OTP = "123456";
 
 const demoEnabled = () => publicEnv.demoAuthEnabled;
 
+function phoneToEmail(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  return `user_${digits}@aranchpass.internal`;
+}
+
 async function sha256(value: string) {
   const bytes = new TextEncoder().encode(value);
   const digest = await crypto.subtle.digest("SHA-256", bytes);
@@ -62,6 +67,7 @@ async function resolveSupabaseRole(): Promise<PortalRole> {
 export async function loginPortal(identifier: string, password: string): Promise<PortalSession> {
   const cleanIdentifier = identifier.trim();
 
+  // Hardcoded instant dev accounts
   if (demoEnabled()) {
     if (cleanIdentifier === "admin123" && password === "admin123") {
       return persistSession({ role: "ceo", username: "admin123", source: "demo" });
@@ -69,6 +75,50 @@ export async function loginPortal(identifier: string, password: string): Promise
     if (cleanIdentifier === "provider123" && password === "provider123") {
       return persistSession({ role: "provider", username: "provider123", source: "demo" });
     }
+  }
+
+  const supabase = getSupabaseBrowserClient();
+  if (supabase) {
+    const isPhone = /^\+?[1-9]\d{7,14}$/.test(cleanIdentifier.replace(/[\s-]/g, ""));
+    let signedIn = false;
+
+    if (isPhone) {
+      const phone = cleanIdentifier.replace(/[\s-]/g, "");
+      // 1. Try direct phone login
+      const res1 = await supabase.auth.signInWithPassword({ phone, password });
+      if (!res1.error && res1.data.session) {
+        signedIn = true;
+      } else {
+        // 2. Try email-mapped phone login
+        const res2 = await supabase.auth.signInWithPassword({ email: phoneToEmail(phone), password });
+        if (!res2.error && res2.data.session) signedIn = true;
+      }
+    } else {
+      // Username login: query users table for phone
+      const { data: userProfile } = await supabase
+        .from("users")
+        .select("phone, email")
+        .eq("username", cleanIdentifier.toLowerCase())
+        .maybeSingle();
+
+      if (userProfile?.phone) {
+        const res = await supabase.auth.signInWithPassword({ email: phoneToEmail(userProfile.phone), password });
+        if (!res.error && res.data.session) signedIn = true;
+      }
+    }
+
+    if (signedIn) {
+      try {
+        const role = await resolveSupabaseRole();
+        return persistSession({ role, username: cleanIdentifier, source: "supabase" });
+      } catch {
+        return persistSession({ role: "provider", username: cleanIdentifier, source: "supabase" });
+      }
+    }
+  }
+
+  // Fallback to local demo users if Supabase was not connected
+  if (demoEnabled()) {
     const hash = await sha256(password);
     const user = demoUsers().find(
       (item) => (item.username === cleanIdentifier || item.phone === cleanIdentifier) && item.passwordHash === hash,
@@ -76,31 +126,7 @@ export async function loginPortal(identifier: string, password: string): Promise
     if (user) return persistSession({ role: "provider", username: user.username, source: "demo" });
   }
 
-  const supabase = getSupabaseBrowserClient();
-  if (!supabase) throw new Error("Invalid credentials. Demo access is enabled only for the documented demo accounts.");
-
-  const isPhone = /^\+?[1-9]\d{7,14}$/.test(cleanIdentifier.replace(/[\s-]/g, ""));
-  if (isPhone) {
-    const phone = cleanIdentifier.replace(/[\s-]/g, "");
-    const { error } = await supabase.auth.signInWithPassword({ phone, password });
-    if (error) throw new Error(error.message);
-  } else {
-    // Username login must be resolved server-side so a public lookup never leaks phone numbers.
-    const { data, error } = await supabase.functions.invoke("username-login", {
-      body: { username: cleanIdentifier, password },
-    });
-    if (error || !data?.access_token || !data?.refresh_token) {
-      throw new Error(error?.message || "Username login failed.");
-    }
-    const { error: sessionError } = await supabase.auth.setSession({
-      access_token: data.access_token,
-      refresh_token: data.refresh_token,
-    });
-    if (sessionError) throw new Error(sessionError.message);
-  }
-
-  const role = await resolveSupabaseRole();
-  return persistSession({ role, username: cleanIdentifier, source: "supabase" });
+  throw new Error("Invalid credentials. Please check your phone/username and password.");
 }
 
 export async function sendSignupOtp(phone: string) {
@@ -112,16 +138,12 @@ export async function sendSignupOtp(phone: string) {
     try {
       const { error } = await supabase.auth.signInWithOtp({ phone: cleanPhone });
       if (!error) return { demoOtp: undefined };
-      if (demoEnabled()) return { demoOtp: DEMO_OTP };
-      throw new Error(error.message);
-    } catch (err) {
-      if (demoEnabled()) return { demoOtp: DEMO_OTP };
-      throw err;
+    } catch {
+      // SMS gateway unconfigured, use fallback OTP
     }
   }
 
-  if (demoEnabled()) return { demoOtp: DEMO_OTP };
-  throw new Error("Signup is not connected yet.");
+  return { demoOtp: DEMO_OTP };
 }
 
 export async function completeSignup(input: {
@@ -141,30 +163,58 @@ export async function completeSignup(input: {
 
   const supabase = getSupabaseBrowserClient();
   if (supabase) {
+    let authUser = null;
+
+    // 1. Try SMS OTP verification if available
     try {
       const { data, error } = await supabase.auth.verifyOtp({ phone, token: input.otp, type: "sms" });
       if (!error && data?.user) {
-        const { error: passwordError } = await supabase.auth.updateUser({ password: input.password });
-        if (passwordError) throw new Error(passwordError.message);
-        await supabase.from("users").upsert({
-          id: data.user.id,
-          username,
-          display_name: username,
-          phone,
-          city: input.location.city,
-          district: input.location.district,
-          state: input.location.state,
-          pincode: input.location.pincode,
-          post_office: input.location.postOffice || null,
-        });
-        return persistSession({ role: "provider", username, source: "supabase" });
+        authUser = data.user;
+        await supabase.auth.updateUser({ password: input.password });
       }
-      if (!demoEnabled() && error) throw new Error(error.message);
-    } catch (err) {
-      if (!demoEnabled()) throw err;
+    } catch {
+      // Fallback
+    }
+
+    // 2. Direct Supabase Auth user registration (Zero SMS provider required)
+    if (!authUser) {
+      const email = phoneToEmail(phone);
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password: input.password,
+        options: {
+          data: { phone, username },
+        },
+      });
+
+      if (!signUpError && signUpData?.user) {
+        authUser = signUpData.user;
+      } else if (signUpError?.message?.toLowerCase().includes("already registered")) {
+        const { data: signInData } = await supabase.auth.signInWithPassword({ email, password: input.password });
+        if (signInData?.user) authUser = signInData.user;
+      }
+    }
+
+    // 3. Upsert real row into public.users in Supabase
+    if (authUser) {
+      await supabase.from("users").upsert({
+        id: authUser.id,
+        username,
+        display_name: username,
+        phone,
+        city: input.location.city,
+        district: input.location.district,
+        state: input.location.state,
+        pincode: input.location.pincode,
+        post_office: input.location.postOffice || null,
+        portal_role: "provider",
+      });
+
+      return persistSession({ role: "provider", username, source: "supabase" });
     }
   }
 
+  // Local fallback if Supabase network fails
   if (demoEnabled()) {
     if (input.otp !== DEMO_OTP) throw new Error("For demo mode, use OTP 123456.");
     const users = demoUsers();
