@@ -164,10 +164,26 @@ export function FounderSection() {
   return (
     <section id="founder" ref={ref} className="bg-paper py-20 sm:py-28">
       <Container>
-        <div className="reveal grid gap-10 lg:grid-cols-[0.72fr_1.28fr] lg:items-end">
-          <div>
-            <Eyebrow>Founder</Eyebrow>
-            <p className="mono mt-5 text-[12px] tracking-[0.16em] text-violet uppercase">Aryan · Founder & CEO</p>
+        <div className="reveal grid gap-10 lg:grid-cols-[0.72fr_1.28fr] lg:items-center">
+          <div className="flex flex-col gap-6">
+            <div>
+              <Eyebrow>Founder</Eyebrow>
+              <p className="mono mt-4 text-[12px] tracking-[0.16em] text-violet uppercase">Aryan · Founder & CEO</p>
+            </div>
+            <figure className="clip-corner image-frame group relative max-w-[360px] overflow-hidden border border-line bg-ivory shadow-[0_24px_55px_-32px_rgba(46,7,89,0.35)]">
+              <div className="overflow-hidden bg-ivory">
+                <img
+                  src="/images/founder-aryan.webp"
+                  alt="Aryan — Founder and CEO of ARANCH PASS"
+                  loading="lazy"
+                  className="aspect-[4/5] w-full object-cover object-top transition-transform duration-700 ease-[cubic-bezier(.22,.68,.24,1)] group-hover:scale-[1.025]"
+                />
+              </div>
+              <figcaption className="label flex items-center justify-between border-t border-line bg-paper px-4 py-3 text-violet">
+                <span>Aryan</span>
+                <span className="text-saffron">Founder & CEO</span>
+              </figcaption>
+            </figure>
           </div>
           <div>
             <h2 className="font-display t-4 max-w-[20ch] font-bold text-deepviolet">

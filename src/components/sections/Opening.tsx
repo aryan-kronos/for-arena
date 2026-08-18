@@ -2,7 +2,7 @@ import { InteractivePass } from "@/components/InteractivePass";
 import { HeroBackgroundFilm } from "@/components/HeroBackgroundFilm";
 import { QrIcon } from "@/components/icons";
 
-import { Button, Container, Eyebrow, Note, TraceLine } from "@/components/ui";
+import { Button, Container, Eyebrow, Note, SealRing, TraceLine } from "@/components/ui";
 import { bandItems, manifestoLines } from "@/data";
 import { useReveal } from "@/hooks/useReveal";
 
@@ -121,15 +121,56 @@ export function ProblemManifesto() {
               <span className="accent text-ivory/45">The connection gets lost.</span>
             </h2>
           </div>
-          <div className="reveal relative">
-            <div aria-hidden="true" className="absolute inset-[5%] -rotate-2 border border-ivory/15 bg-ivory/[.035] clip-corner" />
-            <div aria-hidden="true" className="absolute top-[16%] right-[2%] h-[56%] w-[16%] bg-saffron" />
-            <div className="relative px-5 py-12 sm:px-10">
-              <InteractivePass className="mx-auto w-full max-w-[500px]" />
+          <div className="reveal relative flex flex-col justify-between overflow-hidden clip-corner border border-ivory/20 bg-[#110221] p-6 sm:p-8 shadow-[0_32px_100px_-36px_rgba(0,0,0,0.9)]">
+            {/* Technical blueprint dot grid */}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 bg-[radial-gradient(rgba(247,240,216,0.07)_1px,transparent_1px)] [background-size:22px_22px]"
+            />
+
+            {/* Corner optical registration brackets */}
+            <div aria-hidden="true" className="pointer-events-none absolute top-3 left-3 h-3 w-3 border-t-2 border-l-2 border-saffron/40" />
+            <div aria-hidden="true" className="pointer-events-none absolute top-3 right-3 h-3 w-3 border-t-2 border-r-2 border-saffron/40" />
+            <div aria-hidden="true" className="pointer-events-none absolute bottom-3 left-3 h-3 w-3 border-b-2 border-l-2 border-saffron/40" />
+            <div aria-hidden="true" className="pointer-events-none absolute bottom-3 right-3 h-3 w-3 border-b-2 border-r-2 border-saffron/40" />
+
+            {/* Rotating SealRing watermark */}
+            <SealRing
+              tone="saffron"
+              className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[460px] opacity-[0.11]"
+            />
+
+            {/* Multi-layered radiant golden aura */}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute left-1/2 top-1/2 h-[340px] w-[340px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(244,173,8,0.26)_0%,rgba(77,22,136,0.2)_45%,transparent_75%)] blur-[38px]"
+            />
+
+            {/* Stage header bar */}
+            <div className="relative mb-2 flex items-center justify-between border-b border-ivory/10 pb-3">
+              <span className="mono flex items-center gap-2 text-[9px] tracking-[0.2em] text-saffron uppercase">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-saffron animate-pulse" />
+                Physical Decal Inspection
+              </span>
+              <span className="mono text-[9px] tracking-[0.14em] text-ivory/45 uppercase">
+                01/50 · AP-7K3M9
+              </span>
             </div>
-            <div className="relative flex flex-wrap justify-between gap-2 border-t border-ivory/12 pt-3">
-              <span className="label text-saffron">The physical way back</span>
-              <span className="label text-ivory/40">Interactive model</span>
+
+            {/* Interactive 3D Model */}
+            <div className="relative py-5 sm:py-7">
+              <InteractivePass className="mx-auto w-full max-w-[480px]" />
+            </div>
+
+            {/* Stage footer bar */}
+            <div className="relative mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-ivory/10 pt-3">
+              <span className="label flex items-center gap-2 text-saffron">
+                <span className="inline-block h-1.5 w-1.5 rotate-45 bg-saffron" />
+                The physical way back
+              </span>
+              <span className="mono text-[10px] tracking-[0.14em] text-ivory/45 uppercase">
+                Interactive model
+              </span>
             </div>
           </div>
         </div>

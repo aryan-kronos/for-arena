@@ -1,11 +1,14 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PassBackArtwork, PassFrontArtwork } from "@/components/PassArtwork";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
+import { cn } from "@/utils/cn";
 
 type Props = {
   className?: string;
   /** thickness of the pass edge in px */
   depth?: number;
+  /** Show interactive control presets (Front, Back, Spin, Reset) */
+  showControls?: boolean;
 };
 
 const REST_Y = -14;
@@ -17,12 +20,16 @@ const MAX_Y = 62;
  * - autoplay oscillation (never edge-on)
  * - cursor-follow tilt on desktop
  * - pointer/touch drag, eased return to rest, autoplay resumes
+ * - quick view controls (Front, Back, Orbit, Reset)
  * - reduced motion: static angled view
  */
-export function InteractivePass({ className = "", depth = 8 }: Props) {
+export function InteractivePass({ className = "", depth = 8, showControls = false }: Props) {
   const stageRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const reduced = usePrefersReducedMotion();
+  const [activeView, setActiveView] = useState<"auto" | "front" | "back">("auto");
+
+  const setTargetAngleRef = useRef<((targetX: number, targetY: number, mode: "auto" | "front" | "back") => void) | null>(null);
 
   useEffect(() => {
     const card = cardRef.current;
@@ -51,6 +58,15 @@ export function InteractivePass({ className = "", depth = 8 }: Props) {
     let dragBaseX = 0;
     let pointerYOffset = 0;
     let pointerXOffset = 0;
+    let mode: "auto" | "front" | "back" = "auto";
+
+    setTargetAngleRef.current = (tx: number, ty: number, newMode: "auto" | "front" | "back") => {
+      mode = newMode;
+      targetX = tx;
+      targetY = ty;
+      released = performance.now();
+      setActiveView(newMode);
+    };
 
     const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 
@@ -58,16 +74,18 @@ export function InteractivePass({ className = "", depth = 8 }: Props) {
       if (!running) return;
       t += 0.016;
       if (!dragging) {
-        const settling = performance.now() - released < 1400;
-        if (settling || hovering) {
-          targetY = REST_Y + pointerYOffset;
-          targetX = REST_X + pointerXOffset;
-        } else {
-          // gentle automatic oscillation around rest
-          targetY = REST_Y + Math.sin(t * 0.55) * 16 + pointerYOffset;
-          targetX = REST_X + Math.sin(t * 0.38) * 3 + pointerXOffset;
+        if (mode === "auto") {
+          const settling = performance.now() - released < 1400;
+          if (settling || hovering) {
+            targetY = REST_Y + pointerYOffset;
+            targetX = REST_X + pointerXOffset;
+          } else {
+            // gentle automatic oscillation around rest
+            targetY = REST_Y + Math.sin(t * 0.55) * 16 + pointerYOffset;
+            targetX = REST_X + Math.sin(t * 0.38) * 3 + pointerXOffset;
+          }
         }
-        const ease = settling ? 0.055 : 0.09;
+        const ease = mode === "auto" ? 0.08 : 0.1;
         rotY += (targetY - rotY) * ease;
         rotX += (targetX - rotX) * ease;
       }
@@ -93,6 +111,8 @@ export function InteractivePass({ className = "", depth = 8 }: Props) {
 
     const onPointerDown = (e: PointerEvent) => {
       dragging = true;
+      mode = "auto";
+      setActiveView("auto");
       card.classList.add("is-dragging");
       dragStartX = e.clientX;
       dragStartY = e.clientY;
@@ -106,7 +126,7 @@ export function InteractivePass({ className = "", depth = 8 }: Props) {
         rotX = clamp(dragBaseX - (e.clientY - dragStartY) * 0.22, -34, 34);
         card.style.transform = `rotateX(${rotX.toFixed(2)}deg) rotateY(${rotY.toFixed(2)}deg)`;
         e.preventDefault();
-      } else if (e.pointerType === "mouse" && hovering) {
+      } else if (e.pointerType === "mouse" && hovering && mode === "auto") {
         const r = stage.getBoundingClientRect();
         const nx = (e.clientX - r.left) / r.width - 0.5;
         const ny = (e.clientY - r.top) / r.height - 0.5;
@@ -154,7 +174,7 @@ export function InteractivePass({ className = "", depth = 8 }: Props) {
   }, [reduced]);
 
   return (
-    <div ref={stageRef} className={`pass-stage select-none ${className}`}>
+    <div ref={stageRef} className={`pass-stage relative select-none ${className}`}>
       <div
         ref={cardRef}
         className="pass-3d relative aspect-[1344/797] w-full"
@@ -187,6 +207,44 @@ export function InteractivePass({ className = "", depth = 8 }: Props) {
           <PassBackArtwork className="h-full w-full" dieCut={false} />
         </div>
       </div>
+
+      {showControls && (
+        <div className="absolute right-0 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-1.5 pointer-events-auto">
+          <button
+            type="button"
+            onClick={() => setTargetAngleRef.current?.(0, 0, "front")}
+            aria-label="View front face"
+            className={cn(
+              "mono flex h-8 w-8 items-center justify-center border text-[10px] font-bold transition-colors",
+              activeView === "front" ? "border-saffron bg-saffron text-plum" : "border-ivory/20 bg-plum/90 text-ivory/80 hover:border-saffron hover:text-saffron",
+            )}
+          >
+            F
+          </button>
+          <button
+            type="button"
+            onClick={() => setTargetAngleRef.current?.(0, 180, "back")}
+            aria-label="View reverse face"
+            className={cn(
+              "mono flex h-8 w-8 items-center justify-center border text-[10px] font-bold transition-colors",
+              activeView === "back" ? "border-saffron bg-saffron text-plum" : "border-ivory/20 bg-plum/90 text-ivory/80 hover:border-saffron hover:text-saffron",
+            )}
+          >
+            B
+          </button>
+          <button
+            type="button"
+            onClick={() => setTargetAngleRef.current?.(REST_X, REST_Y, "auto")}
+            aria-label="Resume auto orbit"
+            className={cn(
+              "mono flex h-8 w-8 items-center justify-center border text-[11px] font-bold transition-colors",
+              activeView === "auto" ? "border-saffron bg-saffron text-plum" : "border-ivory/20 bg-plum/90 text-ivory/80 hover:border-saffron hover:text-saffron",
+            )}
+          >
+            ↻
+          </button>
+        </div>
+      )}
     </div>
   );
 }

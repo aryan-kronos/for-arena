@@ -257,9 +257,11 @@ export function ActivationRitual() {
 
         <ol className="relative mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           <li aria-hidden="true" className="pointer-events-none absolute left-[12.5%] right-[12.5%] top-1/2 z-0 hidden -translate-y-1/2 lg:block">
-            <div className="h-[3px] bg-violet/22" />
-            <div className="absolute inset-x-0 top-1/2 h-3 -translate-y-1/2 overflow-hidden blur-[5px]"><div className="h-full w-1/3 bg-saffron/60 transition-transform duration-1000 ease-[cubic-bezier(.22,.68,.24,1)]" style={{transform:`translateX(${active*100}%)`}}/></div>
-            <div className="absolute top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-deepviolet bg-saffron shadow-[0_0_0_8px_rgba(244,173,8,.2),0_0_28px_rgba(244,173,8,.9)] transition-[left] duration-1000 ease-[cubic-bezier(.22,.68,.24,1)]" style={{left:`${active*(100/3)}%`}} />
+            <div className="h-[1.5px] w-full bg-violet/15" />
+            <div
+              className="absolute top-1/2 h-[2px] w-12 -translate-x-1/2 -translate-y-1/2 bg-saffron shadow-[0_0_8px_#f4ad08] transition-[left] duration-700 ease-[cubic-bezier(.22,.68,.24,1)]"
+              style={{ left: `${(active / 3) * 100}%` }}
+            />
           </li>
           {ritualSteps.map((s, i) => (
             <li key={s.n} className="relative z-10">
@@ -270,7 +272,7 @@ export function ActivationRitual() {
                 onBlur={() => setHovered(null)}
                 tabIndex={0}
                 className={cn(
-                  "clip-corner h-full border bg-ivory/60 p-5 transition-[transform,background-color,border-color,box-shadow] duration-700 ease-[cubic-bezier(.22,.68,.24,1)] sm:p-6",
+                  "clip-corner h-full border bg-ivory p-5 transition-[transform,background-color,border-color,box-shadow] duration-700 ease-[cubic-bezier(.22,.68,.24,1)] sm:p-6",
                   active === i
                     ? "ritual-card-active border-deepviolet bg-ivory shadow-[0_22px_55px_-34px_rgba(46,7,89,.85)]"
                     : "border-line",
@@ -293,28 +295,6 @@ export function ActivationRitual() {
             </li>
           ))}
         </ol>
-
-        <div className="reveal clip-corner mt-8 grid gap-8 overflow-hidden bg-deepviolet p-6 text-ivory sm:p-9 lg:grid-cols-[0.78fr_1.22fr] lg:items-center">
-          <div className="mx-auto w-full max-w-[360px]">
-            <PassObject tilt={-3} />
-          </div>
-          <div>
-            <span className="label text-saffron">Activation preview · no appliance composite</span>
-            <h3 className="font-display t-2 mt-4">The pass is activated before placement.</h3>
-            <p className="mt-3 max-w-[48ch] text-[14px] leading-relaxed text-ivory/70">
-              Final placement photography will be produced only after the physical size, adhesive,
-              surface preparation and approved position are tested on real equipment.
-            </p>
-            <div className="mt-6 grid grid-cols-2 gap-px bg-ivory/15 sm:grid-cols-4">
-              {ritualSteps.map((step) => (
-                <div key={step.n} className="bg-plum/70 px-3 py-4">
-                  <span className="mono text-[10px] text-saffron">{step.n}</span>
-                  <p className="mt-1 text-[12px] font-semibold">{step.title}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
       </Container>
     </section>
   );
