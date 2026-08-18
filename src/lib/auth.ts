@@ -106,12 +106,22 @@ export async function loginPortal(identifier: string, password: string): Promise
 export async function sendSignupOtp(phone: string) {
   const cleanPhone = phone.replace(/[\s-]/g, "");
   if (!/^\+?[1-9]\d{7,14}$/.test(cleanPhone)) throw new Error("Enter a valid phone number with country code.");
-  if (demoEnabled() && !getSupabaseBrowserClient()) return { demoOtp: DEMO_OTP };
+
   const supabase = getSupabaseBrowserClient();
-  if (!supabase) throw new Error("Signup is not connected yet.");
-  const { error } = await supabase.auth.signInWithOtp({ phone: cleanPhone });
-  if (error) throw new Error(error.message);
-  return { demoOtp: undefined };
+  if (supabase) {
+    try {
+      const { error } = await supabase.auth.signInWithOtp({ phone: cleanPhone });
+      if (!error) return { demoOtp: undefined };
+      if (demoEnabled()) return { demoOtp: DEMO_OTP };
+      throw new Error(error.message);
+    } catch (err) {
+      if (demoEnabled()) return { demoOtp: DEMO_OTP };
+      throw err;
+    }
+  }
+
+  if (demoEnabled()) return { demoOtp: DEMO_OTP };
+  throw new Error("Signup is not connected yet.");
 }
 
 export async function completeSignup(input: {
@@ -129,32 +139,42 @@ export async function completeSignup(input: {
     throw new Error("Add and verify the business city, state and six-digit PIN code.");
   }
 
-  if (demoEnabled() && !getSupabaseBrowserClient()) {
-    if (input.otp !== DEMO_OTP) throw new Error("For this local demo, use OTP 123456.");
+  const supabase = getSupabaseBrowserClient();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({ phone, token: input.otp, type: "sms" });
+      if (!error && data?.user) {
+        const { error: passwordError } = await supabase.auth.updateUser({ password: input.password });
+        if (passwordError) throw new Error(passwordError.message);
+        await supabase.from("users").upsert({
+          id: data.user.id,
+          username,
+          display_name: username,
+          phone,
+          city: input.location.city,
+          district: input.location.district,
+          state: input.location.state,
+          pincode: input.location.pincode,
+          post_office: input.location.postOffice || null,
+        });
+        return persistSession({ role: "provider", username, source: "supabase" });
+      }
+      if (!demoEnabled() && error) throw new Error(error.message);
+    } catch (err) {
+      if (!demoEnabled()) throw err;
+    }
+  }
+
+  if (demoEnabled()) {
+    if (input.otp !== DEMO_OTP) throw new Error("For demo mode, use OTP 123456.");
     const users = demoUsers();
-    if (users.some((item) => item.username === username || item.phone === phone)) throw new Error("That demo username or phone is already registered on this browser.");
-    users.push({ username, phone, passwordHash: await sha256(input.password), role: "provider", location: input.location });
+    const existingIndex = users.findIndex((item) => item.username === username || item.phone === phone);
+    const newUser = { username, phone, passwordHash: await sha256(input.password), role: "provider" as const, location: input.location };
+    if (existingIndex >= 0) users[existingIndex] = newUser;
+    else users.push(newUser);
     localStorage.setItem(USERS_KEY, JSON.stringify(users));
     return persistSession({ role: "provider", username, source: "demo" });
   }
 
-  const supabase = getSupabaseBrowserClient();
-  if (!supabase) throw new Error("Signup is not connected yet.");
-  const { data, error } = await supabase.auth.verifyOtp({ phone, token: input.otp, type: "sms" });
-  if (error || !data.user) throw new Error(error?.message || "OTP verification failed.");
-  const { error: passwordError } = await supabase.auth.updateUser({ password: input.password });
-  if (passwordError) throw new Error(passwordError.message);
-  const { error: profileError } = await supabase.from("users").upsert({
-    id: data.user.id,
-    username,
-    display_name: username,
-    phone,
-    city: input.location.city,
-    district: input.location.district,
-    state: input.location.state,
-    pincode: input.location.pincode,
-    post_office: input.location.postOffice || null,
-  });
-  if (profileError) throw new Error(profileError.message);
-  return persistSession({ role: "provider", username, source: "supabase" });
+  throw new Error("Signup is not connected yet.");
 }
